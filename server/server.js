@@ -1,5 +1,6 @@
 const express = require('express');
 const cors = require('cors');
+const path = require('path');
 const { connectDB } = require('./config/db');
 require('dotenv').config();
 
@@ -9,17 +10,20 @@ const app = express();
 connectDB();
 
 // Init Middleware
-app.use(express.json());
 app.use(cors());
+app.use(express.json());
 
-// Test route
-app.get('/', (req, res) => {
-    res.json({ message: 'API is running' });
-});
+// Serve static files from the client directory
+app.use(express.static(path.join(__dirname, '../client')));
 
-// Define Routes
+// API Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
+
+// Serve index.html for all other routes
+app.get('*', (req, res) => {
+    res.sendFile(path.join(__dirname, '../client/index.html'));
+});
 
 const PORT = process.env.PORT || 5000;
 
