@@ -35,10 +35,6 @@ const Task = sequelize.define('Task', {
         type: DataTypes.BOOLEAN,
         defaultValue: false
     }
-}, {
-    timestamps: true,
-    createdAt: 'created_at',
-    updatedAt: false
 });
 
 module.exports = Task;
