@@ -3,42 +3,64 @@ require('dotenv').config();
 
 let sequelize;
 
-if (process.env.NODE_ENV === 'production') {
-    // For production (using environment variables)
-    sequelize = new Sequelize(process.env.DATABASE_URL, {
-        dialect: 'mysql',
-        dialectOptions: {
-            ssl: {
-                require: true,
-                rejectUnauthorized: false
-            }
-        }
-    });
-} else {
-    // For development (local database)
-    sequelize = new Sequelize(
-        process.env.DB_NAME,
-        process.env.DB_USER,
-        process.env.DB_PASSWORD,
-        {
-            host: process.env.DB_HOST,
-            dialect: 'mysql',
-            port: process.env.DB_PORT,
-            logging: false
-        }
-    );
-}
-
-const connectDB = async () => {
+const setupSequelize = () => {
     try {
-        await sequelize.authenticate();
-        console.log('Database connection established successfully.');
-        await sequelize.sync({ alter: true });
-        console.log('Database synchronized');
+        sequelize = new Sequelize(
+            process.env.MYSQLDATABASE,
+            process.env.MYSQLUSER,
+            process.env.MYSQLPASSWORD,
+            {
+                host: process.env.MYSQLHOST,
+                port: process.env.MYSQLPORT,
+                dialect: 'mysql',
+                dialectOptions: {
+                    ssl: {
+                        rejectUnauthorized: true
+                    }
+                },
+                pool: {
+                    max: 5,
+                    min: 0,
+                    acquire: 30000,
+                    idle: 10000
+                },
+                logging: console.log // Remove this in production
+            }
+        );
+        console.log('Sequelize instance created');
+        return sequelize;
     } catch (error) {
-        console.error('Unable to connect to the database:', error);
-        process.exit(1);
+        console.error('Sequelize setup error:', error);
+        throw error;
     }
 };
 
-module.exports = { sequelize, connectDB };
+const connectDB = async () => {
+    try {
+        if (!sequelize) {
+            setupSequelize();
+        }
+        await sequelize.authenticate();
+        console.log('Database connection established successfully.');
+        
+        // Sync models with retry logic
+        let retries = 5;
+        while (retries > 0) {
+            try {
+                await sequelize.sync({ alter: true });
+                console.log('Database synchronized');
+                break;
+            } catch (error) {
+                retries--;
+                if (retries === 0) throw error;
+                console.log(`Database sync failed, retrying... (${retries} attempts left)`);
+                await new Promise(resolve => setTimeout(resolve, 5000));
+            }
+        }
+    } catch (error) {
+        console.error('Unable to connect to the database:', error);
+        throw error;
+    }
+};
+
+module.exports = { sequelize: setupSequelize(), connectDB };

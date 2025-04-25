@@ -1,38 +1,56 @@
 const express = require('express');
 const cors = require('cors');
-const path = require('path');
 const { connectDB } = require('./config/db');
 require('dotenv').config();
 
 const app = express();
 
-// Connect Database
-connectDB();
+// Connect Database with retry logic
+const connectWithRetry = async () => {
+    try {
+        await connectDB();
+        console.log('Database connected successfully');
+    } catch (err) {
+        console.error('Database connection error:', err);
+        console.log('Retrying in 5 seconds...');
+        setTimeout(connectWithRetry, 5000);
+    }
+};
 
 // Init Middleware
 app.use(express.json());
 app.use(cors());
 
-// Serve static files from the client directory
-app.use(express.static(path.join(__dirname, '../client')));
+// Basic error handling middleware
+app.use((err, req, res, next) => {
+    console.error(err.stack);
+    res.status(500).send('Something broke!');
+});
+
+// Health check route
+app.get('/health', (req, res) => {
+    res.json({ status: 'OK', time: new Date() });
+});
 
 // Define Routes
 app.use('/api/auth', require('./routes/auth'));
 app.use('/api/tasks', require('./routes/tasks'));
 
-// Serve static assets in production
-if (process.env.NODE_ENV === 'production') {
-    // Set static folder
-    app.use(express.static('client'));
-
-    // Any route that gets hit here, send to client/index.html
-    app.get('*', (req, res) => {
-        res.sendFile(path.resolve(__dirname, '../client', 'index.html'));
-    });
-}
-
 const PORT = process.env.PORT || 5000;
 
-app.listen(PORT, () => {
+// Start server with error handling
+const server = app.listen(PORT, '0.0.0.0', () => {
     console.log(`Server is running on port ${PORT}`);
 });
+
+server.on('error', (err) => {
+    console.error('Server error:', err);
+});
+
+// Handle unhandled promise rejections
+process.on('unhandledRejection', (err) => {
+    console.error('Unhandled Rejection:', err);
+});
+
+// Connect to database
+connectWithRetry();
