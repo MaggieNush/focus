@@ -1,3 +1,32 @@
+function setupEventListeners() {
+    const loginForm = document.getElementById('login-form');
+    
+    if (loginForm) {
+        loginForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            console.log('Login form submitted');
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            if (!email || !password) {
+                alert('Please enter both email and password');
+                return;
+            }
+            
+            try {
+                await login(email, password);
+            } catch (error) {
+                console.error('Login submission error:', error);
+                alert('Login failed: ' + error.message);
+            }
+        });
+    } else {
+        console.error('Login form not found!');
+    }
+    
+    // ... rest of your event listeners ...
+
 // API and Auth Configuration
 const API_URL = window.location.origin;
 let authToken = localStorage.getItem('authToken');
@@ -34,7 +63,7 @@ let isRunning = false;
 // Authentication Functions
 async function login(email, password) {
     try {
-        console.log('Attempting login...', { email }); // Debug log
+        console.log('Making login request to:', `${API_URL}/api/auth/login`);
 
         const response = await fetch(`${API_URL}/api/auth/login`, {
             method: 'POST',
@@ -44,14 +73,22 @@ async function login(email, password) {
             body: JSON.stringify({ email, password })
         });
 
-        console.log('Login response status:', response.status); // Debug log
-        const data = await response.json();
-        console.log('Login response:', data); // Debug log
+        console.log('Login response received:', {
+            status: response.status,
+            ok: response.ok
+        });
 
-        if (!response.ok) throw new Error(data.message || 'Login failed');
+        const data = await response.json();
+        console.log('Login response data:', data);
+
+        if (!response.ok) {
+            throw new Error(data.message || 'Login failed');
+        }
         
         authToken = data.token;
         localStorage.setItem('authToken', authToken);
+        
+        console.log('Login successful, token stored');
         
         // Show main app
         document.getElementById('auth-container').style.display = 'none';
@@ -60,7 +97,7 @@ async function login(email, password) {
         // Load tasks
         await loadTasks();
     } catch (error) {
-        console.error('Login error:', error);
+        console.error('Login error details:', error);
         alert('Login failed: ' + error.message);
     }
 }
@@ -199,14 +236,25 @@ function createTaskElement(task) {
 // Event Listeners
 function setupEventListeners() {
     // Auth form listeners
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
+    const loginForm = document.getElementById('login-form');
+    console.log('Login form found:', loginForm); // Debug log
+
+    loginForm.addEventListener('submit', async (e) => {
         e.preventDefault();
         console.log('Login form submitted'); // Debug log
         
-        const email = e.target.querySelector('input[name="email"]').value;
-        const password = e.target.querySelector('input[name="password"]').value;
+        const emailInput = e.target.querySelector('input[name="email"]');
+        const passwordInput = e.target.querySelector('input[name="password"]');
         
-        console.log('Form values:', { email }); // Debug log
+        console.log('Form elements:', { 
+            emailFound: !!emailInput, 
+            passwordFound: !!passwordInput 
+        }); // Debug log
+        
+        const email = emailInput.value;
+        const password = passwordInput.value;
+        
+        console.log('Attempting login with email:', email); // Debug log
         await login(email, password);
     });
 
